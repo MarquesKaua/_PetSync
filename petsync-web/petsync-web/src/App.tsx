@@ -4,6 +4,9 @@ import { auth } from "./firebase";
 import Login from "./Login";
 import Painel from "./Painel";
 import Historico from "./Historico";
+import Alertas from "./Alertas";
+import Estoque from "./Estoque";
+import Configuracoes from "./Configuracoes";
 
 export default function App() {
   const [usuario, setUsuario] = useState<User | null>(null);
@@ -26,7 +29,11 @@ export default function App() {
       <p>Logado como {usuario.email}</p>
       <button onClick={() => signOut(auth)}>Sair</button>
       <Painel />
+      <Alertas />
       <Historico />
+      <Estoque />
+      <Configuracoes />
+
     </div>
   );
 }
