@@ -3,6 +3,7 @@ import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { auth } from "./firebase";
 import Login from "./Login";
 import Painel from "./Painel";
+import Historico from "./Historico";
 
 export default function App() {
   const [usuario, setUsuario] = useState<User | null>(null);
@@ -25,6 +26,7 @@ export default function App() {
       <p>Logado como {usuario.email}</p>
       <button onClick={() => signOut(auth)}>Sair</button>
       <Painel />
+      <Historico />
     </div>
   );
 }
