@@ -2,3 +2,4 @@ node_modules
 chave-admin.json
 .env
 CONTEXTO.md
+segredos.h
