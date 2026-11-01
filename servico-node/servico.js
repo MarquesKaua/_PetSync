@@ -580,6 +580,7 @@ function iniciarN5() {
     );
 
   setInterval(verificarOffline, (rapido ? 5 : 15) * 1000);
+  
 }
 
 // Ao (re)conectar no broker, dá um tempo de tolerância antes de declarar offline
@@ -589,6 +590,67 @@ client.on("connect", () => {
 client.once("connect", iniciarN5);
 
 setInterval(gravarEstado, ESTADO_MS);
+// ===== N6: abastecimentos =====
+async function processarAbastecimento(docSnap) {
+  const ref = docSnap.ref;
+  const refEstoque = db.collection("estoque").doc("atual");
+
+  const resumo = await db.runTransaction(async (t) => {
+    const [s, est] = await t.getAll(ref, refEstoque);
+    if (!s.exists) return null;
+    const d = s.data();
+
+    // Já processado antes (inclui os fictícios, que já têm o "depois")
+    if (d.estimado_depois_g !== undefined || d.recusado === true) return null;
+
+    const tipo = d.tipo;
+    const q = d.quantidade_g;
+    const invalido =
+      !["adicionei", "ajustei"].includes(tipo) ||
+      typeof q !== "number" || !Number.isFinite(q) || q < 0 || q > 20000 ||
+      (tipo === "adicionei" && q <= 0);
+
+    if (invalido) {
+      t.update(ref, { recusado: true, motivo: "Dados invalidos" });
+      return "recusado (dados inválidos)";
+    }
+
+    const antes =
+      est.exists && typeof est.data().estimado_g === "number" ? est.data().estimado_g : 0;
+    const depois = tipo === "adicionei" ? antes + q : q;
+    const agora = Timestamp.now();
+
+    t.update(ref, { estimado_antes_g: antes, estimado_depois_g: depois });
+    t.set(
+      refEstoque,
+      { estimado_g: depois, atualizado_em: agora, ultimo_abastecimento_em: agora },
+      { merge: true }
+    );
+    return `${tipo}: ${antes} -> ${depois} g`;
+  });
+
+  if (resumo) console.log(`abastecimento ${docSnap.id}: ${resumo}.`);
+}
+
+function iniciarN6() {
+  db.collection("estoque")
+    .doc("atual")
+    .collection("abastecimentos")
+    .onSnapshot(
+      (snap) => {
+        for (const ch of snap.docChanges()) {
+          if (ch.type === "added") {
+            processarAbastecimento(ch.doc).catch((e) =>
+              console.error("Erro ao processar abastecimento:", e.message)
+            );
+          }
+        }
+      },
+      (e) => console.error("Erro ao ouvir abastecimentos:", e.message)
+    );
+}
+
+iniciarN6();
 setInterval(gravarLeitura, LEITURA_MS);
 
 client.on("error", (e) => console.error("Erro MQTT:", e.message));

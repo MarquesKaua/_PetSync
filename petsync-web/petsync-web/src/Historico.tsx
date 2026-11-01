@@ -147,7 +147,7 @@ export default function Historico() {
             <LineChart data={pontos}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="hora" minTickGap={40} />
-              <YAxis domain={[0, 100]} unit="%" />
+              <YAxis domain={[-5, 105]} ticks={[0, 25, 50, 75, 100]} unit="%" />
               <Tooltip />
               <Legend />
               <Line
@@ -155,7 +155,7 @@ export default function Historico() {
                 dataKey="agua"
                 name="Água"
                 stroke="#1976d2"
-                dot={false}
+                dot={{ r: 2 }}
                 connectNulls={false}
               />
               <Line
@@ -163,7 +163,7 @@ export default function Historico() {
                 dataKey="racao"
                 name="Ração no pote"
                 stroke="#e67e22"
-                dot={false}
+                dot={{ r: 2 }}
                 connectNulls={false}
               />
             </LineChart>
