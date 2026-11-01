@@ -437,6 +437,39 @@ let estoqueG = null;
 let limiteEstoqueG = null;
 let minimoAguaPct = null;
 
+function avisarTutor(tipo, mensagem) {
+  const { TELEGRAM_TOKEN, TELEGRAM_CHAT_ID } = process.env;
+  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
+    console.log("Telegram: sem TELEGRAM_TOKEN ou TELEGRAM_CHAT_ID no .env, aviso não enviado.");
+    return;
+  }
+
+  const titulos = {
+    estoque_racao_baixo: "🥣 Ração acabando",
+    agua_baixa: "💧 Água baixa",
+    esp32_offline: "📡 Dispositivo offline",
+    sensor_invalido: "⚠️ Sensor com problema",
+    reservatorio_vazio: "💧 Reservatório de água vazio",
+  };
+  const texto = `${titulos[tipo] || "PetSync"}\n${mensagem}`;
+  console.log(`Telegram: enviando aviso de ${tipo}...`);
+
+  fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: texto }),
+    signal: AbortSignal.timeout(10000),
+  })
+    .then(async (r) => {
+      if (r.ok) {
+        console.log("Telegram: aviso enviado.");
+      } else {
+        console.error(`Telegram recusou o aviso (HTTP ${r.status}): ${await r.text()}`);
+      }
+    })
+    .catch((e) => console.error("Erro ao avisar pelo Telegram:", e.message));
+}
+
 async function abrirAlerta(tipo, mensagem) {
   if (abertos.has(tipo)) return;
   abertos.add(tipo);
@@ -450,7 +483,10 @@ async function abrirAlerta(tipo, mensagem) {
       t.set(db.collection("alertas").doc(), ficha);
       return true;
     });
-    if (criou) console.log(`ALERTA aberto: ${tipo}.`);
+        if (criou) {
+      console.log(`ALERTA aberto: ${tipo}.`);
+      avisarTutor(tipo, mensagem);
+    }
   } catch (e) {
     abertos.delete(tipo);
     console.error(`Erro ao abrir alerta ${tipo}:`, e.message);

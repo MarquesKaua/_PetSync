@@ -3,3 +3,5 @@ chave-admin.json
 .env
 CONTEXTO.md
 segredos.h
+checar-token.js
+publicar-pedido.js
