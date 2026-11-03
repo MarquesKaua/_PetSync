@@ -2,6 +2,7 @@
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
+#include <WiFiMulti.h>
 #include <Preferences.h>
 #include "config.h"
 #include <time.h>
@@ -37,7 +38,7 @@ int falhasSeguidas = 0;
 WiFiClientSecure rede;
 PubSubClient mqtt(rede);
 Preferences prefs;
-
+WiFiMulti wifiMulti;
 Config cfg;
 
 bool horaValida() {
@@ -529,21 +530,23 @@ void manterConexoes() {
   static unsigned long tentativaWifi = 0;
   static unsigned long tentativaMqtt = 0;
   static bool eraConectado = false;
+  static bool primeiraTentativa = true;
 
   bool conectado = (WiFi.status() == WL_CONNECTED);
   if (conectado && !eraConectado) {
-    Serial.printf("Wi-Fi conectado. IP: %s\n", WiFi.localIP().toString().c_str());
+    Serial.printf("Wi-Fi conectado em \"%s\". IP: %s\n",
+                  WiFi.SSID().c_str(), WiFi.localIP().toString().c_str());
     configTzTime("<-03>3", "pool.ntp.org", "time.google.com");
   }
   if (!conectado && eraConectado) Serial.println("Wi-Fi caiu.");
   eraConectado = conectado;
 
   if (!conectado) {
-    if (millis() - tentativaWifi > 15000) {
+    if (primeiraTentativa || millis() - tentativaWifi > 15000) {
+      primeiraTentativa = false;
       tentativaWifi = millis();
-      Serial.println("Tentando conectar no Wi-Fi...");
-      WiFi.disconnect();
-      WiFi.begin(WIFI_SSID, WIFI_SENHA);
+      Serial.println("Procurando uma rede conhecida...");
+      wifiMulti.run(8000);  // escolhe a de sinal mais forte entre as duas
     }
     return;
   }
@@ -567,7 +570,6 @@ void manterConexoes() {
     Serial.printf(" falhou (estado %d)\n", mqtt.state());
   }
 }
-
 void setup() {
   Serial.begin(115200);
   delay(500);
@@ -583,7 +585,8 @@ void setup() {
   mqtt.setCallback(aoReceber);
 
   WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_SENHA);  // sem esperar
+  wifiMulti.addAP(WIFI_SSID_1, WIFI_SENHA_1);
+  wifiMulti.addAP(WIFI_SSID_2, WIFI_SENHA_2);
   configTzTime("<-03>3", "pool.ntp.org", "time.google.com");
 }
 

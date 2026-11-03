@@ -142,7 +142,6 @@ function lerConfirmacao(m) {
     },
   };
 }
-
 async function processarConfirmacao({ cmd_id, ficha }) {
   if (ficha.status === "duplicado") {
     console.log(`Confirmação ${cmd_id}: o ESP32 respondeu "duplicado". Nada a gravar, o registro original já existe.`);
@@ -187,9 +186,18 @@ async function processarConfirmacao({ cmd_id, ficha }) {
       ? `Confirmação ${cmd_id} repetida: ignorada, sem descontar de novo.`
       : `alimentacoes/${cmd_id} gravada: ${resumo}.`
   );
+
+  if (
+    resumo !== null &&
+    ficha.status === "rejeitado" &&
+    ficha.motivo === "Limite diario atingido"
+  ) {
+    abrirAlerta(
+      "limite_diario_atingido",
+      "Limite diário de ração atingido. Novos pedidos serão recusados até amanhã."
+    );
+  }
 }
-
-
 const client = mqtt.connect(opcoes);
 
 client.on("connect", () => {
@@ -534,7 +542,10 @@ function verificarOffline() {
       .doc("atual")
       .set({ dispositivo: { online: false } }, { merge: true })
       .catch((e) => console.error("Erro ao marcar offline:", e.message));
-    abrirAlerta("esp32_offline", "Dispositivo sem comunicação com o servidor.");
+        abrirAlerta(
+      "esp32_offline",
+      "Dispositivo sem comunicação com o servidor (pode estar desligado, sem Wi-Fi ou sem hora)."
+    );
   }
 }
 
@@ -624,6 +635,25 @@ client.on("connect", () => {
   ultimoContatoMs = Date.now();
 });
 client.once("connect", iniciarN5);
+
+// Fecha o alerta de limite diário quando ele é de um dia anterior
+async function resolverLimiteDeOntem() {
+  if (!abertos.has("limite_diario_atingido")) return;
+  const s = await db
+    .collection("alertas")
+    .where("tipo", "==", "limite_diario_atingido")
+    .where("ativo", "==", true)
+    .get();
+  const hoje = new Date().toLocaleDateString("sv-SE"); // AAAA-MM-DD no seu fuso
+  const antigo = s.docs.some(
+    (d) => d.data().criado_em.toDate().toLocaleDateString("sv-SE") !== hoje
+  );
+  if (antigo) resolverAlerta("limite_diario_atingido");
+}
+setInterval(
+  () => resolverLimiteDeOntem().catch((e) => console.error("Erro no limite diário:", e.message)),
+  60 * 1000
+);
 
 setInterval(gravarEstado, ESTADO_MS);
 // ===== N6: abastecimentos =====
